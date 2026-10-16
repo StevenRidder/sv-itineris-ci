@@ -12,13 +12,16 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from server.adapters.store import Store, canonical, checksum, now
 from server.domain.models import PreviewRequest, SaveRequest, Scenario
-from server.domain.planning import PlanningError, preview_change
+from server.codex_adapter import CodexProcess
+from server.chat import install_chat
+from server.services import make_preview
 
 
-def create_app(data_dir=None):
+def create_app(data_dir=None, assistant_factory=CodexProcess):
     store = Store(data_dir or os.environ.get("SVITINERIS_DATA_DIR", ".data"))
     app = FastAPI(title="SV Itineris", version="0.1.0")
     app.state.store = store
+    install_chat(app, store, assistant_factory)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "testserver"])
 
     @app.middleware("http")
@@ -45,7 +48,7 @@ def create_app(data_dir=None):
 
     @app.get("/api/v1/health")
     def health():
-        return {"ok": True, "mode": "local-pilot", "assistant": "not-connected", "version": "0.1.0"}
+        return {"ok": True, "mode": "local-pilot", "assistant": "codex-subscription", "version": "0.2.0"}
 
     @app.get("/api/v1/voyage")
     def voyage():
@@ -60,25 +63,7 @@ def create_app(data_dir=None):
 
     @app.post("/api/v1/scenarios/{scenario_id}/preview")
     def preview(scenario_id: str, body: PreviewRequest):
-        with store.connection() as db:
-            db.execute("BEGIN IMMEDIATE")
-            raw = store.scenario(scenario_id, db)
-            if not raw:
-                raise HTTPException(404, "Scenario not found")
-            base = Scenario.model_validate(raw)
-            if base.revision != body.base_revision:
-                raise HTTPException(409, "Scenario changed. Refresh and preview again.")
-            try:
-                calculated, changes, warnings = preview_change(base, body.operations)
-            except PlanningError as error:
-                raise HTTPException(422, str(error)) from error
-            proposal_id = str(uuid.uuid4())
-            library_revision = store.library_revision(db)
-            result = {"id": proposal_id, "base_id": base.id, "base_revision": base.revision,
-                      "library_revision": library_revision, "scenario": calculated.model_dump(mode="json"),
-                      "changes": changes, "warnings": warnings}
-            db.execute("INSERT INTO proposals VALUES(?,?,?,?,?,?)", (proposal_id, base.id, base.revision, library_revision, canonical(result), now()))
-        return result
+        return make_preview(store, scenario_id, body)
 
     @app.post("/api/v1/proposals/{proposal_id}/save-as", status_code=201)
     def save(proposal_id: str, body: SaveRequest, idempotency_key: str = Header(min_length=8, max_length=128)):

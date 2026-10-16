@@ -38,6 +38,9 @@ class Store:
             CREATE TABLE IF NOT EXISTS proposals(id TEXT PRIMARY KEY, base_id TEXT NOT NULL, base_revision INTEGER NOT NULL,
               library_revision INTEGER NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS saves(key TEXT PRIMARY KEY, request_hash TEXT NOT NULL, scenario_id TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS chats(id TEXT PRIMARY KEY, thread_id TEXT, created_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS chat_messages(id INTEGER PRIMARY KEY, chat_id TEXT NOT NULL,
+              role TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL);
             """)
 
     @contextmanager

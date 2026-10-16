@@ -30,4 +30,13 @@ No model tool or browser argument can select another principal.
 This is a single-owner local pilot. It binds to loopback, rejects unknown Host
 and browser Origin values, disables cross-origin access and accepts JSON mutations
 only. Hosted identity, HTTPS, backups and access review precede external hosting.
-No API key, live model, weather, booking or clearance service is connected.
+The local assistant adapter spawns the user's authenticated Codex app-server over
+stdio. It disables inherited MCP servers/apps, web search, memories and execution
+environments. Only bounded planner dynamic tools are exposed. Unexpected server
+requests fail closed. There is no provider billing fallback or credential in the
+browser. Codex owns inference and thread history; SQLite stores chat transcripts
+and opaque thread mappings. Each chat serializes its turns and each turn receives
+the current view context. Previews compose through the same service as manual
+controls; model text does not directly update the map or save records. The browser
+applies typed selection/proposal events. Interrupted turns remain incomplete.
+Weather, booking and clearance services are not connected.
