@@ -11,6 +11,7 @@ STAGES = [("van", "vanuatu", "Vanuatu"), ("sol", "solomons", "Solomons"),
           ("transfer", "png_bypass", "Transfer allowance"), ("raja", "raja_ampat", "Raja Ampat"),
           ("staging", "staging", "North Maluku"), ("palau", "palau", "Palau"),
           ("ph", "philippines", "Philippines"), ("sea", "singapore_window", "Singapore window")]
+PLACE_LABELS = {"van": "Vanuatu", "sol": "Solomon Islands", "raja": "Raja Ampat", "staging": "North Maluku", "palau": "Palau", "ph": "Philippines", "sea": "Singapore"}
 PLACE_NAMES = {"Port Vila": "van", "Honiara": "sol", "Raja Ampat central": "raja", "Morotai": "staging",
                "Koror": "palau", "Coron": "ph", "Singapore": "sea"}
 # NOAA NWS defining points, rounded destination centres. Not waypoints.
@@ -84,7 +85,7 @@ def import_folder(store, folder):
             parsed = parse_seed(seed, sid)
             for p in seed.get("places_map_view_only", []):
                 if p["name"] in PLACE_NAMES:
-                    places.append({"id": PLACE_NAMES[p["name"]], "name": p["country"], "coordinates": [float(p["lon"]), float(p["lat"])]})
+                    places.append({"id": PLACE_NAMES[p["name"]], "name": PLACE_LABELS[PLACE_NAMES[p["name"]]], "coordinates": [float(p["lon"]), float(p["lat"])]})
             places.extend({"id": i, "name": name, "coordinates": [lon, lat]} for i, name, lon, lat in FSM)
         for match in IMAGE.finditer(body):
             uri = match.group(1) or match.group(2)
