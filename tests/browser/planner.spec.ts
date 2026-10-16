@@ -24,6 +24,8 @@ test('source, preview, branch, month precision, geometry and sanitized library',
  await page.getByLabel('One longitude, latitude pair per line').fill('150, 0\n151, 1');
  await page.getByRole('button',{name:'Preview geometry',exact:true}).click();
  await expect(page.locator('#changes')).toContainText('Draft geometry updated');
+ await expect(page.locator('#draft-legend')).toBeVisible();
+ await expect(page.locator('#map-note')).toContainText('does not recalculate');
  await page.getByRole('button',{name:'Discard preview',exact:true}).click();
  await page.getByRole('button',{name:'Sketch a route',exact:true}).click();
  await page.locator('#map').scrollIntoViewIfNeeded();

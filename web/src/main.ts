@@ -64,6 +64,8 @@ function render(){
 }
 function renderMap(){
  const s=shown();if(!s||!mapReady||!map)return;
+ el('map-note').textContent=s.draft_geometry?'Draft geometry is a destination sketch. It does not recalculate the calendar or validate passages.':s.route_family==='R'?'The unresolved Solomons–Raja passage is omitted from route R. Natural Earth geographic overview; no navigation charts.':'Natural Earth destination overview. Passage allowances and exact timing remain unverified.';
+ el('draft-legend').hidden=!s.draft_geometry;
  const ids=activeIds(s.route_family),places=ids.map(id=>voyage.places.find(p=>p.id===id)).filter((p):p is Place=>!!p);
  const features:GeoJSON.Feature[]=[];
  places.forEach((p,i)=>{if(i&&!(s.route_family==='R'&&p.id==='raja'))features.push({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:[places[i-1].coordinates,p.coordinates]}});});
