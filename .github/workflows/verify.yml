@@ -1,0 +1,52 @@
+name: Verify exact SV Itineris SHA
+run-name: SV Itineris ${{ github.sha }}
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: verify-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.repository == 'StevenRidder/sv-itineris-ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.8'
+      - name: Source export policy
+        run: python3 scripts/source_policy.py
+      - name: Locked dependencies
+        run: |
+          npm ci
+          uv sync --frozen
+          npx playwright install --with-deps chromium
+      - name: Build, domain, API and browser verification
+        run: npm run check
+      - name: Verify receipt
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json,os,subprocess
+          sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          assert sha == os.environ['SOURCE_SHA']
+          tree=subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()
+          open('verification-receipt.json','w').write(json.dumps({'sha':sha,'tree':tree,'suite':'build/domain/api/browser/source-policy'}))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verification-receipt
+          path: verification-receipt.json

@@ -1,0 +1,2 @@
+import { defineConfig } from '@playwright/test';
+export default defineConfig({testDir:'tests/browser',fullyParallel:false,workers:1,retries:0,timeout:45000,use:{baseURL:'http://127.0.0.1:9082',viewport:{width:1280,height:900},launchOptions:{executablePath:process.env.SVITINERIS_BROWSER_EXECUTABLE,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']}},webServer:{command:'uv run --frozen python scripts/browser_server.py',url:'http://127.0.0.1:9082/api/v1/health',reuseExistingServer:false,timeout:30000},reporter:[['list']],outputDir:'test-results'});

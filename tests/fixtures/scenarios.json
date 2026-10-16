@@ -1,0 +1,100 @@
+{
+  "schema_version": "0.5.0",
+  "fixture_notice": "Synthetic test calendar. No private voyage data.",
+  "scenarios": [
+    {
+      "id": "B",
+      "name": "Synthetic balanced example",
+      "route_family": "R",
+      "vanuatu": [
+        "2030-01-15",
+        "2030-04-15"
+      ],
+      "solomons": [
+        "2030-04-16",
+        "2030-06-14"
+      ],
+      "png_bypass": [
+        "2030-06-15",
+        "2030-07-21"
+      ],
+      "raja_ampat": [
+        "2030-07-22",
+        "2030-10-01"
+      ],
+      "staging": [
+        "2030-10-02",
+        "2030-11-14"
+      ],
+      "palau": [
+        "2030-11-15",
+        "2031-02-11"
+      ],
+      "philippines": [
+        "2031-02-12",
+        "2031-04-25"
+      ],
+      "singapore_window": [
+        "2031-05-21",
+        "2031-07-02"
+      ]
+    },
+    {
+      "id": "E",
+      "name": "Synthetic combined month windows",
+      "route_family": "H",
+      "vanuatu": "Jan\u2013Apr 2030",
+      "solomons": "Apr\u2013Jun 2030",
+      "fsm": "Jun\u2013Sep 2030",
+      "raja_north": "Sep\u2013Oct 2030",
+      "raja_misool": "Oct\u2013Nov 2030",
+      "palau": "Dec 2030\u2013Mar 2031",
+      "philippines": "Mar\u2013Jun 2031",
+      "singapore_johor": "Timing unresolved"
+    }
+  ],
+  "places_map_view_only": [
+    {
+      "name": "Port Vila",
+      "country": "Vanuatu",
+      "lon": 168.323,
+      "lat": -17.734
+    },
+    {
+      "name": "Honiara",
+      "country": "Solomons",
+      "lon": 159.95,
+      "lat": -9.433
+    },
+    {
+      "name": "Raja Ampat central",
+      "country": "Raja Ampat",
+      "lon": 130.7,
+      "lat": -0.45
+    },
+    {
+      "name": "Morotai",
+      "country": "North Maluku",
+      "lon": 128.4,
+      "lat": 2.35
+    },
+    {
+      "name": "Koror",
+      "country": "Palau",
+      "lon": 134.48,
+      "lat": 7.34
+    },
+    {
+      "name": "Coron",
+      "country": "Philippines",
+      "lon": 120.2,
+      "lat": 11.99
+    },
+    {
+      "name": "Singapore",
+      "country": "Singapore",
+      "lon": 103.85,
+      "lat": 1.29
+    }
+  ]
+}

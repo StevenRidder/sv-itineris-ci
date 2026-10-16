@@ -1,0 +1,8 @@
+Copyright 2026 Steve Ridder. All rights reserved.
+
+Application source is published in the verification repository to run CI.
+Publication does not grant a general license to the original SV Itineris code.
+
+Files adapted from Helm retain its Business Source License 1.1, included under
+third_party/helm/. Third-party dependencies and public geographic data retain
+their own licenses. See docs/UPSTREAM.md.

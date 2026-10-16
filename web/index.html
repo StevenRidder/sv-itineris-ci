@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SV Itineris · Voyage planner</title></head>
+<body>
+<header class="navbar navbar-light border-bottom"><div class="container-xl"><a class="navbar-brand" href="/">SV <span class="brand-word">ITINERIS</span></a><div class="d-flex gap-2 align-items-center"><span class="badge bg-green-lt">Local pilot</span><span class="text-secondary small">Private planning</span></div></div></header>
+<main class="container-xl py-4">
+ <div class="page-header mb-4"><div class="row align-items-end g-3"><div class="col"><div class="page-pretitle">Your voyage, with room to change</div><h1 class="page-title">Plan the next chapter</h1><div class="text-secondary mt-1">All route options remain open. Dates and passages are uncommitted.</div></div><div class="col-md-5"><label class="form-label" for="scenario">View an option</label><select id="scenario" class="form-select" disabled></select></div></div></div>
+ <div class="d-flex gap-2 mb-3 flex-wrap"><button class="btn btn-primary" id="nav-plan">Voyage plan</button><button class="btn" id="nav-library">Guides & documents</button><span class="ms-auto text-secondary align-self-center small" id="source-state"></span></div>
+ <div id="error" class="alert alert-danger" role="alert" hidden></div>
+ <div id="empty" class="card p-4" hidden><h2>Import your source library</h2><p>Use the local import command to load your guides and scenario seed. This workspace starts empty.</p><code>uv run python -m server.cli import --root "/path/to/cruising/folder"</code></div>
+ <section id="plan-view" hidden>
+  <div id="routes" class="route-options mb-3" aria-label="Open route families"></div>
+  <div class="planning-layout">
+   <aside class="card"><div class="card-body"><div class="subheader">A real backend preview</div><h2 class="card-title mb-2">Try a different pace</h2><p class="text-secondary">Change a stay, keep the other durations, and see what moves.</p>
+    <form id="change-form"><label class="form-label" for="stage">Stay</label><select id="stage" class="form-select mb-3"></select><label class="form-label" for="nights">Add or remove nights</label><input id="nights" class="form-control mb-3" type="number" min="-180" max="180" value="21" required><button class="btn btn-primary w-100" id="preview-change">Preview change</button></form>
+    <p id="precision-note" class="small text-secondary mt-2"></p>
+    <div id="proposal" class="mt-4" hidden><div class="subheader">Proposed alternative</div><ul id="changes" class="change-list"></ul><div id="warnings" class="small text-secondary mb-3"></div><label class="form-label" for="save-name">Name this option</label><input class="form-control mb-2" id="save-name" maxlength="100"><button id="save" class="btn btn-primary w-100">Save new option</button><button id="discard" class="btn btn-link w-100">Discard preview</button></div>
+    <div class="assistant-next mt-4"><div class="subheader">Assistant · next milestone</div><p class="small text-secondary mb-0">A live LLM will use these same source and planning services. No AI replies are simulated here.</p></div>
+    <details class="mt-3"><summary>Enter draft route coordinates</summary><label class="form-label mt-2" for="coordinates">One longitude, latitude pair per line</label><textarea id="coordinates" class="form-control mb-2" rows="3" placeholder="Draw on the map or enter points"></textarea><button class="btn btn-sm" id="use-coordinates">Preview geometry</button></details>
+   </div></aside>
+   <div class="plan-canvas">
+    <section class="card"><div class="card-header d-flex justify-content-between flex-wrap gap-2"><div><h2 id="map-title" class="card-title">Destination overview</h2><div class="small text-secondary">Planning geometry · passages unverified</div></div><div class="btn-list"><button id="draw-route" class="btn btn-sm" disabled>Sketch a route</button><button id="stop-drawing" class="btn btn-sm" hidden>Stop drawing</button></div></div><div id="map" role="region" aria-label="Interactive destination map"></div><div class="card-body py-3"><div class="d-flex align-items-center gap-2 flex-wrap"><label for="place" class="small text-secondary">Destination</label><select id="place" class="form-select form-select-sm place-select"></select><button id="place-guide" class="btn btn-sm ms-auto">Find its guide</button></div><p id="map-note" class="small text-secondary mb-0 mt-2">The unresolved Solomons–Raja passage is omitted from route R. Natural Earth geographic overview; no navigation charts.</p></div></section>
+    <section class="card mt-3"><div class="card-header"><div><h2 class="card-title">Calendar & stay lengths</h2><div id="date-basis" class="small text-secondary"></div></div><span class="badge bg-cyan-lt ms-auto" id="preview-state">Source</span></div><div class="card-body p-0"><div id="timeline"></div></div></section>
+   </div>
+  </div>
+ </section>
+ <section id="library-view" hidden><div class="library-layout"><aside class="card"><div class="card-body"><label class="form-label" for="search">Find a guide or document</label><input class="form-control" id="search" type="search" placeholder="Place, permission, birding…"></div><div class="list-group list-group-flush" id="documents"></div></aside><article class="card"><div id="document" class="card-body document-body"><h2>Your source library</h2><p>Select a document to read its imported revision.</p></div></article></div></section>
+ <div id="notice" class="small text-secondary mt-3" aria-live="polite"></div>
+</main>
+<footer class="container-xl border-top py-3 small text-secondary d-flex justify-content-between gap-2 flex-wrap"><span>SV ITINERIS · local planning pilot</span><span>Original source files stay unchanged · no boat commands or live model</span></footer>
+<script type="module" src="/src/main.ts"></script>
+</body></html>
