@@ -3,3 +3,6 @@ body{min-width:320px}.brand-word{letter-spacing:.18em;font-size:.85rem;margin-le
 @media(max-width:850px){.planning-layout,.library-layout{grid-template-columns:1fr}.planning-layout>aside{order:2}.plan-canvas{order:1}.route-options{gap:8px}.route-option{padding:10px}#map{height:350px}}
 @media(max-width:480px){.page-title{font-size:24px}.route-options{grid-template-columns:1fr}.route-option{display:flex;align-items:center;gap:10px}.route-option small{margin:0}.stage-row{grid-template-columns:82px minmax(0,1fr) 56px;padding:9px 12px;gap:8px;font-size:11px}.stage-name small{font-size:11px}#map{height:320px}.map-pin{font-size:11px;padding:3px 4px}.card-header{padding:14px}.document-body{padding:16px}}
 #map.is-drawing .map-pin{pointer-events:none;opacity:.5}
+
+.route-option{flex-direction:column;align-items:flex-start}
+@media(max-width:480px){.route-option{flex-direction:row;align-items:center}}
