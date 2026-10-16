@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Route} from '@playwright/test';
 
 // Deterministic synthetic tile responses; public CI never depends on tile services.
 test.beforeEach(async({page})=>{
@@ -95,10 +95,14 @@ test('map layers, measurement, point inspection and editable drafts preserve dat
 });
 
 test('tile failure leaves the local map and planning controls usable',async({page})=>{
- await page.route('https://tiles.maps.eox.at/**',route=>route.fulfill({status:503,body:'Synthetic provider outage',headers:{'Access-Control-Allow-Origin':'*'}}));
+ const pending:Route[]=[];let first=true,released=false;
+ const outage={status:503,body:'Synthetic provider outage',headers:{'Access-Control-Allow-Origin':'*'}};
+ await page.route('https://tiles.maps.eox.at/**',async route=>{if(first||released){first=false;await route.fulfill(outage);}else pending.push(route);});
  await page.goto('/');await expect(page.locator('.map-pin').first()).toBeVisible();
  await expect(page.locator('#map-layer-status')).toContainText('could not load');
+ await expect.poll(()=>pending.length).toBeGreaterThan(0);
  await page.getByLabel('View',{exact:true}).selectOption('simple');
+ released=true;await Promise.all(pending.map(route=>route.fulfill(outage)));await page.waitForLoadState('networkidle');
  await expect(page.locator('#map-layer-status')).toContainText('works without online tiles');
  await page.getByRole('button',{name:'Zoom to place',exact:true}).click();await expect(page.locator('#map-point-name')).toHaveText('Palau');
  await expect(page.getByRole('button',{name:'Sketch a route',exact:true})).toBeEnabled();

@@ -54,7 +54,12 @@ export function mapLayers(map:Map){
  for(const key of ['labels','seamarks','destinations','source','draft'] as const)el('layer-'+key).addEventListener('change',()=>{settings[key]=el<HTMLInputElement>('layer-'+key).checked;apply();});
  el('satellite-blend').addEventListener('input',()=>{settings.blend=Number(el<HTMLInputElement>('satellite-blend').value);apply();});
  map.on('zoomend',status);
- map.on('error',event=>{if((event as {sourceId?:string}).sourceId?.startsWith('tiles-')){failed=true;status();}});
+ map.on('error',event=>{
+  const id=(event as {sourceId?:string}).sourceId;
+  // A request can fail after its layer was hidden. It is no longer evidence
+  // about the displayed basemap, including the local Simple overview.
+  if(id?.startsWith('tiles-')&&map.getLayer(id)&&map.getLayoutProperty(id,'visibility')!=='none'){failed=true;status();}
+ });
  apply(false);
  return {refresh(){visible('route',settings.source);visible('draft',settings.draft);}};
 }
