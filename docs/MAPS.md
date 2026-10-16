@@ -33,7 +33,8 @@ check or an ETA. Measurements and inspected points are transient, not saved plan
 Fullscreen includes the layer and planning controls, and a nautical scale is shown.
 
 Online data is a best-effort dependency. Failed tiles leave local map geometry and
-planning controls usable; the status offers Simple overview. There is no bulk
+planning controls usable; the status offers Simple overview. Late errors from
+hidden tile layers do not replace the current basemap's status. There is no bulk
 download or offline cache builder. CSP allows only the two named tile origins for
 images/fetches and still permits scripts only from this application.
 
