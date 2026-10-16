@@ -59,7 +59,18 @@ class SetRouteGeometry(StrictModel):
     geometry: Geometry
 
 
-Operation = Annotated[ExtendStay | SetRouteGeometry, Field(discriminator="op")]
+class ShiftDeparture(StrictModel):
+    op: Literal["shift_departure"]
+    start: date
+
+
+class SetArrival(StrictModel):
+    op: Literal["set_arrival"]
+    stage_id: str = Field(min_length=1, max_length=80)
+    start: date
+
+
+Operation = Annotated[ExtendStay | SetRouteGeometry | ShiftDeparture | SetArrival, Field(discriminator="op")]
 
 
 class PreviewRequest(StrictModel):

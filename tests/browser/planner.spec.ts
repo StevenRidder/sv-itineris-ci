@@ -6,6 +6,7 @@ test('source, preview, branch, month precision, geometry and sanitized library',
  await expect(page.locator('.map-pin').first()).toBeVisible();
  await expect(page.locator('#scenario')).toHaveValue('source-B');
  const original=(await page.locator('[data-stage="palau"]').textContent())!;
+ await page.getByText('Manual planning controls',{exact:true}).click();
  await page.getByRole('button',{name:'Preview change',exact:true}).click();
  await expect(page.locator('#proposal')).toBeVisible();
  await expect(page.locator('[data-stage="palau"]')).toContainText('+21d');
@@ -23,6 +24,8 @@ test('source, preview, branch, month precision, geometry and sanitized library',
  await page.getByLabel('One longitude, latitude pair per line').fill('150, 0\n151, 1');
  await page.getByRole('button',{name:'Preview geometry',exact:true}).click();
  await expect(page.locator('#changes')).toContainText('Draft geometry updated');
+ await expect(page.locator('#draft-legend')).toBeVisible();
+ await expect(page.locator('#map-note')).toContainText('does not recalculate');
  await page.getByRole('button',{name:'Discard preview',exact:true}).click();
  await page.getByRole('button',{name:'Sketch a route',exact:true}).click();
  await page.locator('#map').scrollIntoViewIfNeeded();
@@ -44,4 +47,31 @@ test('source, preview, branch, month precision, geometry and sanitized library',
  await expect(page.locator('#map')).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  expect(errors).toEqual([]);
+});
+
+test('chat streams guide receipts, date previews and map routes through shared services',async({page})=>{
+ await page.goto('/');
+ await expect(page.getByRole('button',{name:'Ask Codex',exact:true})).toBeEnabled();
+ await page.getByLabel('Guides, routes or dates').fill('test dates');
+ await page.getByRole('button',{name:'Ask Codex',exact:true}).click();
+ await expect(page.locator('#chat-activity')).toContainText('Reply complete');
+ await expect(page.locator('[data-stage="palau"]')).toContainText('+21d');
+ await expect(page.locator('#proposal')).toBeVisible();
+ await expect(page.locator('#map')).toHaveAttribute('data-preview',/.+/);
+ expect(await page.evaluate(()=>Boolean((window as unknown as {__chatInjection?:boolean}).__chatInjection))).toBe(false);
+ await page.getByLabel('Guides, routes or dates').fill('test guide');
+ await page.getByRole('button',{name:'Ask Codex',exact:true}).click();
+ await expect(page.locator('.chat-sources a')).toHaveCount(1);
+ await page.locator('.chat-sources a').click();
+ await expect(page.locator('#document')).toContainText('Imported source revision');
+ await page.getByRole('button',{name:'Voyage plan',exact:true}).click();
+ await page.getByLabel('Guides, routes or dates').fill('test route');
+ await page.getByRole('button',{name:'Ask Codex',exact:true}).click();
+ await expect(page.locator('#map-title')).toHaveText('FSM option');
+ await expect(page.getByRole('button',{name:'Pohnpei',exact:true})).toBeVisible();
+ await expect(page.locator('#changes')).toContainText('Draft geometry updated');
+ await page.reload();
+ await expect(page.locator('.chat-message.user')).toHaveCount(3);
+ await page.setViewportSize({width:390,height:844});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

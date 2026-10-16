@@ -21,11 +21,15 @@ user explicitly changes that state in a future supported workflow.
 - Exact-day duration changes; month-window scenarios retain their precision.
 - Source-library search and sanitized document display.
 - Private canonical repository and exact-SHA public CI, using synthetic fixtures.
+- Codex subscription chat with bounded guide/planning tools, source receipts,
+  persistent conversations, streamed previews and map updates.
+- Code-owned departure and arrival changes alongside stay-length changes.
 
 ## Next milestones
 
 1. Add arrival locks, explicit passage/buffer editing and richer comparison.
-2. Connect a server-side LLM adapter to search/get/compare/preview tools.
+2. Expand assistant evaluations and complete route/calendar modelling for new
+   destinations, unresolved date windows and explicit passage buffers.
 3. Add preparation evidence states, planning-pack export, private pilot access
    and a tested backup/restore flow.
 4. Inventory Wix content and URLs, then build a separate public projection.
