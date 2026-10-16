@@ -23,6 +23,7 @@ const date=(s:string)=>new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'sho
 let voyage:Voyage={scenarios:[],places:[],library_revision:0},current:Scenario|undefined,proposal:Proposal|undefined;
 let map:GLMap|undefined,mapReady=false,editor:ReturnType<typeof draftEditor>|undefined,markers:maplibregl.Marker[]=[];
 let selectedPlace='',saveKey='';
+let chatId:string|null=localStorage.getItem('itineris-chat'),chatReady=false,chatBusy=false,chatController:AbortController|undefined;
 
 async function api<T>(url:string,body?:unknown,headers:Record<string,string>={}):Promise<T>{
  const response=await fetch('/api/v1/'+url,{method:body===undefined?'GET':'POST',headers:body===undefined?headers:{'Content-Type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body)});
@@ -40,7 +41,7 @@ async function load(preferred?:string){
  select('scenario').innerHTML=voyage.scenarios.map(s=>`<option value="${esc(s.id)}">${esc(s.name)}${s.status==='draft'?' · draft':''}</option>`).join('');
  select('scenario').disabled=!current;el('empty').hidden=!!current;el('plan-view').hidden=!current;
  if(current)select('scenario').value=current.id;
- el('source-state').textContent=`Library revision ${voyage.library_revision} · AI not connected`;
+ el('source-state').textContent=`Library revision ${voyage.library_revision} · Codex subscription`;
  select('place').innerHTML=voyage.places.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
  selectedPlace=voyage.places.find(p=>p.id==='palau')?.id||voyage.places[0]?.id||'';select('place').value=selectedPlace;
  render();await loadDocuments();
@@ -63,6 +64,8 @@ function render(){
 }
 function renderMap(){
  const s=shown();if(!s||!mapReady||!map)return;
+ el('map-note').textContent=s.draft_geometry?'Draft geometry is a destination sketch. It does not recalculate the calendar or validate passages.':s.route_family==='R'?'The unresolved Solomons–Raja passage is omitted from route R. Natural Earth geographic overview; no navigation charts.':'Natural Earth destination overview. Passage allowances and exact timing remain unverified.';
+ el('draft-legend').hidden=!s.draft_geometry;
  const ids=activeIds(s.route_family),places=ids.map(id=>voyage.places.find(p=>p.id===id)).filter((p):p is Place=>!!p);
  const features:GeoJSON.Feature[]=[];
  places.forEach((p,i)=>{if(i&&!(s.route_family==='R'&&p.id==='raja'))features.push({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:[places[i-1].coordinates,p.coordinates]}});});
@@ -71,6 +74,56 @@ function renderMap(){
  markers.forEach(m=>m.remove());markers=[];
  for(const p of places){const button=document.createElement('button');button.className='map-pin'+(p.id===selectedPlace?' is-selected':'');button.textContent=p.name;button.type='button';button.addEventListener('click',()=>{selectedPlace=p.id;select('place').value=p.id;renderMap();});markers.push(new maplibregl.Marker({element:button}).setLngLat(p.coordinates).addTo(map));}
  map.resize();
+ el('map').dataset.preview=proposal?.id||'';
+}
+function chatMessage(role:string,text:string){
+ const article=document.createElement('article');article.className='chat-message '+role;
+ const label=document.createElement('div');label.className='chat-role';label.textContent=role==='user'?'You':'Codex';article.append(label);
+ const content=document.createElement('div');content.className='chat-text';content.textContent=text;article.append(content);el('chat-messages').append(article);return {article,content};
+}
+async function formatChat(content:HTMLElement,text:string){
+ content.innerHTML=DOMPurify.sanitize(await marked.parse(text),{USE_PROFILES:{html:true}});
+ content.querySelectorAll('a').forEach(a=>{const href=a.getAttribute('href')||'';if(!href.startsWith('#document/')){a.target='_blank';a.rel='noopener noreferrer';}});
+}
+function citations(article:HTMLElement,sources:{id:string;title:string;revision:number;start_line:number;end_line:number}[]){
+ const list=document.createElement('div');list.className='chat-sources';
+ for(const source of sources){const a=document.createElement('a');a.href='#document/'+source.id;a.textContent=`${source.title} · rev ${source.revision} · L${source.start_line}–${source.end_line}`;list.append(a);}article.append(list);
+}
+function busyChat(busy:boolean){
+ chatBusy=busy;el<HTMLButtonElement>('chat-send').disabled=busy||!chatReady;el('chat-stop').hidden=!busy;
+ el<HTMLButtonElement>('new-chat').disabled=busy;el<HTMLTextAreaElement>('chat-input').disabled=busy;
+ select('scenario').disabled=busy||!current;document.querySelectorAll<HTMLButtonElement>('#routes button,#save,#discard,#draw-route,#preview-change,#use-coordinates').forEach(b=>b.disabled=busy);
+ if(!busy){el<HTMLButtonElement>('preview-change').disabled=current?.precision!=='day';el<HTMLButtonElement>('draw-route').disabled=!mapReady;}
+}
+async function connectChat(){
+ try{const status=await api<{ready:boolean;message:string}>('assistant/status');chatReady=status.ready;el('chat-status').textContent=status.message;busyChat(false);
+ if(chatId){try{const messages=await api<{role:string;text:string;citations?:Parameters<typeof citations>[1]}[]>('chats/'+chatId);for(const m of messages){const row=chatMessage(m.role,m.text);if(m.role==='assistant'){await formatChat(row.content,m.text);citations(row.article,m.citations||[]);}}}catch{chatId=null;localStorage.removeItem('itineris-chat');}}
+ }catch(e){el('chat-status').textContent='Codex is unavailable. Manual planning controls remain available.';}
+}
+async function askChat(event:SubmitEvent){
+ event.preventDefault();if(!current||chatBusy||!chatReady)return;
+ const field=el<HTMLTextAreaElement>('chat-input'),message=field.value.trim();if(!message)return;
+ const context={chat_id:chatId,message,scenario_id:current.id,base_revision:current.revision,proposal_id:proposal?.id||null};
+ editor?.stop();el('map').classList.remove('is-drawing');el('draw-route').hidden=false;el('stop-drawing').hidden=true;
+ chatMessage('user',message);const reply=chatMessage('assistant','');let text='',finished=false;field.value='';busyChat(true);chatController=new AbortController();el('chat-activity').textContent='Thinking with Codex…';
+ try{
+  const response=await fetch('/api/v1/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(context),signal:chatController.signal});
+  if(!response.ok){const problem=await response.json();throw new Error(typeof problem.detail==='string'?problem.detail:'Chat request failed');}
+  const reader=response.body!.getReader(),decoder=new TextDecoder();let buffer='';
+  const receive=async(item:Record<string,any>)=>{
+   if(item.type==='chat'){chatId=item.chat_id;localStorage.setItem('itineris-chat',chatId!);}
+   else if(item.type==='session'){el('chat-status').textContent=`${item.model} · ChatGPT subscription`;}
+   else if(item.type==='delta'){text+=item.text;reply.content.textContent=text;el('chat-messages').scrollTop=el('chat-messages').scrollHeight;}
+   else if(item.type==='activity'){const labels:Record<string,string>={search_guides:'Searching your guides…',read_guide:'Reading a source…',get_plans:'Comparing plan data…',show_scenario:'Showing a route option…',preview_plan:'Calculating dates…',preview_route:'Drawing a route preview…'};el('chat-activity').textContent=labels[item.tool]||'Using a planning tool…';}
+   else if(item.type==='selection'){current=item.scenario;proposal=undefined;select('scenario').value=current!.id;render();busyChat(true);viewLibrary(false);}
+   else if(item.type==='proposal'){proposal=item.proposal;saveKey=crypto.randomUUID();render();busyChat(true);viewLibrary(false);notice('Chat preview shown on the map and calendar. Save new option to keep it.');}
+   else if(item.type==='done'){finished=true;await formatChat(reply.content,text);citations(reply.article,item.citations||[]);el('chat-activity').textContent='Reply complete · changes remain previews';}
+   else if(item.type==='error')throw new Error(item.message);
+  };
+  while(true){const chunk=await reader.read();buffer+=decoder.decode(chunk.value,{stream:!chunk.done});let newline;while((newline=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,newline);buffer=buffer.slice(newline+1);if(line.trim())await receive(JSON.parse(line));}if(chunk.done)break;}
+  if(!finished)throw new Error('The reply stopped before completion. Retry; any displayed change remains a preview.');
+ }catch(e){const message=e instanceof DOMException&&e.name==='AbortError'?'Reply stopped. Displayed changes remain previews.':e instanceof Error?e.message:String(e);el('chat-activity').textContent=message;reply.content.textContent=text+(text?'\n\n':'')+message;}
+ finally{busyChat(false);chatController=undefined;}
 }
 function createMap(){
  try{map=new maplibregl.Map({container:'map',center:[137,-2],zoom:2.7,style:{version:8,sources:{coast:{type:'geojson',data:'/coastline.geojson'},route:{type:'geojson',data:{type:'FeatureCollection',features:[]}},draft:{type:'geojson',data:{type:'FeatureCollection',features:[]}}},layers:[{id:'ocean',type:'background',paint:{'background-color':'#e3eef0'}},{id:'land',type:'fill',source:'coast',paint:{'fill-color':'#ceddca','fill-outline-color':'#b1c7b4'}},{id:'route',type:'line',source:'route',paint:{'line-color':'#237462','line-width':2.5,'line-dasharray':[2,2]}},{id:'draft',type:'line',source:'draft',paint:{'line-color':'#b77c22','line-width':3,'line-dasharray':[3,2]}}]},attributionControl:{compact:true,customAttribution:'Natural Earth · destination overview'}});
@@ -105,5 +158,9 @@ el('place-guide').addEventListener('click',async()=>{input('search').value=voyag
 el('nav-plan').addEventListener('click',()=>viewLibrary(false));el('nav-library').addEventListener('click',()=>viewLibrary(true));
 el('documents').addEventListener('click',e=>{const id=(e.target as Element).closest<HTMLElement>('[data-doc]')?.dataset.doc;if(id)void showDocument(id);});
 el('document').addEventListener('click',e=>{const href=(e.target as Element).closest('a')?.getAttribute('href');if(href?.startsWith('#document/')){e.preventDefault();void showDocument(href.slice(10));}});
+el('chat-messages').addEventListener('click',e=>{const href=(e.target as Element).closest('a')?.getAttribute('href');if(href?.startsWith('#document/')){e.preventDefault();viewLibrary(true);void showDocument(href.slice(10));}});
+el('chat-form').addEventListener('submit',e=>{void askChat(e as SubmitEvent);});
+el('chat-stop').addEventListener('click',()=>chatController?.abort());
+el('new-chat').addEventListener('click',()=>{chatId=null;localStorage.removeItem('itineris-chat');el('chat-messages').replaceChildren();el('chat-activity').textContent='New chat · current map and preview retained';});
 let searchTimer:ReturnType<typeof setTimeout>;input('search').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{void loadDocuments().catch(error);},200);});
-void load().then(()=>createMap()).catch(error);
+void load().then(()=>{createMap();void connectChat();}).catch(error);
