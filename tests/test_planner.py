@@ -137,7 +137,7 @@ def test_no_automatic_seed(tmp_path):
     client = TestClient(create_app(tmp_path))
     data = client.get("/api/v1/voyage").json()
     assert data["scenarios"] == [] and data["selected_route"] is None
-    assert client.get("/api/v1/health").json()["assistant"] == "not-connected"
+    assert client.get("/api/v1/health").json()["assistant"] == "codex-subscription"
 
 
 def test_place_names_keep_destinations_distinct_from_country(setup):

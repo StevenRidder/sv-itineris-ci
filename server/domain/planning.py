@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from server.domain.models import ExtendStay, Scenario, SetRouteGeometry
+from server.domain.models import ExtendStay, Scenario, SetRouteGeometry, ShiftDeparture, SetArrival
 
 
 class PlanningError(ValueError):
@@ -16,17 +16,28 @@ def preview_change(base: Scenario, operations):
             scenario.draft_geometry = operation.geometry
             changes.append("Draft geometry updated; no navigation command sent.")
             continue
-        if not isinstance(operation, ExtendStay):
+        if not isinstance(operation, (ExtendStay, ShiftDeparture, SetArrival)):
             raise PlanningError("Unsupported planning operation")
         if base.precision != "day":
             raise PlanningError("This scenario uses month windows or unknown dates. Set exact inputs before recalculating.")
-        target = next((s for s in scenario.stages if s.id == operation.stage_id), None)
+        target = scenario.stages[0] if isinstance(operation, ShiftDeparture) else next((s for s in scenario.stages if s.id == operation.stage_id), None)
         if target is None or target.start is None or target.end is None:
             raise PlanningError("Stage with exact dates not found")
-        if target.protected_duration:
+        if target.protected_duration and isinstance(operation, ExtendStay):
             raise PlanningError("This stay duration is protected. An explicit unlock is required.")
         durations = {s.id: (s.end - s.start).days for s in scenario.stages if s.end and s.start}
-        durations[target.id] += operation.nights
+        if isinstance(operation, ExtendStay):
+            durations[target.id] += operation.nights
+        else:
+            index = scenario.stages.index(target)
+            if index:
+                previous = scenario.stages[index-1]
+                gap = (operation.start-previous.end).days
+                if gap < 0:
+                    raise PlanningError("Arrival overlaps the preceding stay. Change that stay first.")
+                target.gap_before = gap
+            else:
+                target.start = operation.start
         if durations[target.id] < 1:
             raise PlanningError("A stay must have at least one night")
         previous_end = None
@@ -41,6 +52,9 @@ def preview_change(base: Scenario, operations):
             previous_end = stage.end
             if stage.preferred_max_nights and durations[stage.id] > stage.preferred_max_nights:
                 warnings.append(f"{stage.name} exceeds its planning preference. This is not a legal-limit determination.")
-        changes.append(f"{target.name}: {operation.nights:+d} nights; later durations and gaps preserved.")
+        if isinstance(operation, ExtendStay):
+            changes.append(f"{target.name}: {operation.nights:+d} nights; later durations and gaps preserved.")
+        else:
+            changes.append(f"{target.name} arrival: {operation.start.isoformat()}; stay durations preserved.")
     scenario.status = "draft"
     return scenario, changes, warnings
