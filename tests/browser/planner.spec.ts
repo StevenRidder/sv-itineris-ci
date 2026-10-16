@@ -1,5 +1,10 @@
 import {test,expect} from '@playwright/test';
 
+// Deterministic synthetic tile responses; public CI never depends on tile services.
+test.beforeEach(async({page})=>{
+ await page.route(/^https:\/\/tiles\.(?:maps\.eox\.at|openseamap\.org)\//,route=>route.fulfill({contentType:'image/png',headers:{'Access-Control-Allow-Origin':'*'},body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64')}));
+});
+
 test('source, preview, branch, month precision, geometry and sanitized library',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/');
@@ -47,6 +52,56 @@ test('source, preview, branch, month precision, geometry and sanitized library',
  await expect(page.locator('#map')).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  expect(errors).toEqual([]);
+});
+
+test('map layers, measurement, point inspection and editable drafts preserve dates',async({page})=>{
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('/');await expect(page.locator('.map-pin').first()).toBeVisible();
+ await page.getByText('Manual planning controls',{exact:true}).click();
+ await page.getByRole('button',{name:'Preview change',exact:true}).click();
+ await expect(page.locator('[data-stage="palau"]')).toContainText('+21d');
+ await page.getByRole('button',{name:'Sketch a route',exact:true}).click();
+ await page.locator('#map').scrollIntoViewIfNeeded();const box=(await page.locator('#map').boundingBox())!;
+ await page.mouse.click(box.x+110,box.y+155);await page.mouse.click(box.x+260,box.y+240);await page.keyboard.press('Enter');
+ await expect(page.locator('#changes')).toContainText('Draft geometry updated');
+ const before=await page.locator('#coordinates').inputValue();
+ await page.getByRole('button',{name:'Edit draft points',exact:true}).click();
+ await page.getByLabel('View',{exact:true}).selectOption('satellite');
+ await expect(page.locator('#map')).toHaveAttribute('data-basemap','satellite');
+ await expect(page.locator('#map-layer-status')).toContainText('2025');
+ await page.locator('#map').scrollIntoViewIfNeeded();const changed=(await page.locator('#map').boundingBox())!;
+ await page.mouse.move(changed.x+110,changed.y+155);await page.mouse.down();await page.mouse.move(changed.x+150,changed.y+185,{steps:8});await page.mouse.up();
+ await page.getByRole('button',{name:'Preview edited route',exact:true}).click();
+ await expect(page.locator('#coordinates')).not.toHaveValue(before);
+ await expect(page.locator('[data-stage="palau"]')).toContainText('+21d');
+ await expect(page.getByRole('button',{name:'Ask Codex',exact:true})).toBeEnabled();
+ await page.locator('.map-layer-picker summary').click();
+ await page.getByLabel('Voyage destinations',{exact:true}).uncheck();await expect(page.locator('.map-pin').first()).toBeHidden();
+ await page.getByLabel('Voyage destinations',{exact:true}).check();await expect(page.locator('.map-pin').first()).toBeVisible();
+ await page.getByLabel('Community seamarks',{exact:true}).check();await expect(page.locator('#seamark-note')).toBeVisible();
+ await page.locator('.map-layer-picker summary').click();
+ await page.getByRole('button',{name:'Measure',exact:true}).click();await page.locator('#map').scrollIntoViewIfNeeded();const measured=(await page.locator('#map').boundingBox())!;
+ await page.mouse.click(measured.x+130,measured.y+150);await page.mouse.click(measured.x+310,measured.y+200);
+ await expect(page.locator('#measurement-result')).toContainText('NM · 1 segments');
+ await page.getByRole('button',{name:'Done measuring',exact:true}).click();
+ await page.mouse.click(measured.x+350,measured.y+160);await expect(page.locator('#map-point')).toBeVisible();
+ await page.getByRole('button',{name:'Ask about this point',exact:true}).click();
+ await expect(page.getByLabel('Guides, routes or dates')).toHaveValue(/Help me plan near/);
+ await page.getByLabel('View',{exact:true}).selectOption('simple');await page.reload();
+ await expect(page.locator('#map')).toHaveAttribute('data-basemap','simple');
+ await page.setViewportSize({width:320,height:900});await page.locator('.map-layer-picker summary').click();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ expect(errors).toEqual([]);
+});
+
+test('tile failure leaves the local map and planning controls usable',async({page})=>{
+ await page.route('https://tiles.maps.eox.at/**',route=>route.fulfill({status:503,body:'Synthetic provider outage',headers:{'Access-Control-Allow-Origin':'*'}}));
+ await page.goto('/');await expect(page.locator('.map-pin').first()).toBeVisible();
+ await expect(page.locator('#map-layer-status')).toContainText('could not load');
+ await page.getByLabel('View',{exact:true}).selectOption('simple');
+ await expect(page.locator('#map-layer-status')).toContainText('works without online tiles');
+ await page.getByRole('button',{name:'Zoom to place',exact:true}).click();await expect(page.locator('#map-point-name')).toHaveText('Palau');
+ await expect(page.getByRole('button',{name:'Sketch a route',exact:true})).toBeEnabled();
 });
 
 test('chat streams guide receipts, date previews and map routes through shared services',async({page})=>{

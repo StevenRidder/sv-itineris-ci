@@ -40,3 +40,13 @@ the current view context. Previews compose through the same service as manual
 controls; model text does not directly update the map or save records. The browser
 applies typed selection/proposal events. Interrupted turns remain incomplete.
 Weather, booking and clearance services are not connected.
+
+Map imagery is fetched directly by the browser from two explicitly allowed tile
+origins. Providers never receive the private library, chat transcript or scenario
+database. The local coastline stays underneath online basemaps. Layer switching
+changes visibility without replacing MapLibre's style, so camera, draft geometry
+and Terra Draw remain intact. Map and layer preferences are local browser state.
+Measurements use bounded Geometry input and a stateless Python great-circle
+calculation. Editing a draft chains onto its existing proposal through the same
+revision-checked service as chat. Map clicks prefill a question only; they do not
+send a model request. See MAPS.md for sources and operational limits.

@@ -18,7 +18,29 @@
     </div></details><div id="proposal" class="mt-4" hidden><div class="subheader">Proposed alternative</div><ul id="changes" class="change-list"></ul><div id="warnings" class="small text-secondary mb-3"></div><label class="form-label" for="save-name">Name this option</label><input class="form-control mb-2" id="save-name" maxlength="100"><button id="save" class="btn btn-primary w-100">Save new option</button><button id="discard" class="btn btn-link w-100">Discard preview</button></div>
    </div></aside>
    <div class="plan-canvas">
-    <section class="card"><div class="card-header d-flex justify-content-between flex-wrap gap-2"><div><h2 id="map-title" class="card-title">Destination overview</h2><div class="small text-secondary">Planning geometry · passages unverified</div></div><div class="btn-list"><button id="draw-route" class="btn btn-sm" disabled>Sketch a route</button><button id="stop-drawing" class="btn btn-sm" hidden>Stop drawing</button></div></div><div id="map" role="region" aria-label="Interactive destination map"></div><div class="card-body py-3"><div class="d-flex align-items-center gap-2 flex-wrap"><label for="place" class="small text-secondary">Destination</label><select id="place" class="form-select form-select-sm place-select"></select><button id="place-guide" class="btn btn-sm ms-auto">Find its guide</button></div><p id="map-note" class="small text-secondary mb-0 mt-2">The unresolved Solomons–Raja passage is omitted from route R. Natural Earth geographic overview; no navigation charts.</p></div></section>
+    <section class="card map-card" id="map-card">
+     <div class="card-header d-flex justify-content-between flex-wrap gap-2"><div><h2 id="map-title" class="card-title">Destination overview</h2><div class="small text-secondary">Planning geometry · passages unverified</div></div><div class="btn-list"><button id="fit-voyage" class="btn btn-sm">Fit voyage</button><button id="draw-route" class="btn btn-sm" disabled>Sketch a route</button><button id="edit-route" class="btn btn-sm" disabled>Edit draft points</button><button id="apply-route" class="btn btn-sm btn-primary" hidden>Preview edited route</button><button id="stop-drawing" class="btn btn-sm" hidden>Cancel sketch</button><button id="measure-route" class="btn btn-sm" aria-pressed="false">Measure</button></div></div>
+     <div class="map-toolbar">
+      <label for="basemap" class="small">View</label><select id="basemap" class="form-select form-select-sm"><option value="coastal">Coastal map</option><option value="satellite">Satellite · 2025</option><option value="streets">Streets & places</option><option value="simple">Simple overview</option></select>
+      <details class="map-layer-picker"><summary>Layers</summary><div class="layer-options">
+       <label class="form-check"><input class="form-check-input" type="checkbox" id="layer-labels" checked><span class="form-check-label">Place & road labels</span></label>
+       <label class="form-check"><input class="form-check-input" type="checkbox" id="layer-seamarks"><span class="form-check-label">Community seamarks</span></label>
+       <label class="form-check"><input class="form-check-input" type="checkbox" id="layer-destinations" checked><span class="form-check-label">Voyage destinations</span></label>
+       <label class="form-check"><input class="form-check-input" type="checkbox" id="layer-source" checked><span class="form-check-label">Source route overview</span></label>
+       <label class="form-check"><input class="form-check-input" type="checkbox" id="layer-draft" checked><span class="form-check-label">Draft route preview</span></label>
+      </div></details>
+      <div id="satellite-controls" hidden><label for="satellite-blend" class="small">Satellite blend <span id="blend-value">100%</span></label><input id="satellite-blend" class="form-range" type="range" min="0" max="100" value="100"></div>
+     </div>
+     <div id="map" role="region" aria-label="Interactive destination map"></div>
+     <div class="map-status"><span id="map-layer-status" role="status"></span><span id="map-coordinates" class="tabular-nums">Click the map to inspect a point</span></div>
+     <div class="card-body py-3">
+      <div id="map-point" class="map-point mb-3" hidden><div><div class="subheader" id="map-point-name">Map point</div><div id="map-point-coordinates"></div><div id="map-point-dates" class="small text-secondary"></div></div><button class="btn btn-sm" id="ask-map-point">Ask about this point</button></div>
+      <div id="measurement" class="mb-3" hidden><div id="measurement-result" aria-live="polite">Click two or more points to measure.</div><div class="small text-secondary">Direct great-circle segments, not a routed sea passage.</div><button class="btn btn-sm mt-2" id="clear-measurement">Clear measurement</button></div>
+      <div class="d-flex align-items-center gap-2 flex-wrap"><label for="place" class="small text-secondary">Destination</label><select id="place" class="form-select form-select-sm place-select"></select><button id="zoom-place" class="btn btn-sm">Zoom to place</button><button id="place-guide" class="btn btn-sm ms-auto">Find its guide</button></div>
+      <p id="seamark-note" class="small text-secondary mt-2 mb-0" hidden>Community coverage varies; this layer does not provide official charts or depths.</p>
+      <p id="map-note" class="small text-secondary mb-0 mt-2">Destination overview; no navigation charts.</p>
+     </div>
+    </section>
     <div class="map-legend" aria-label="Map route legend"><span class="source-line">Source route overview</span><span class="draft-line" id="draft-legend" hidden>Draft geometry preview</span></div>
     <section class="card mt-3"><div class="card-header"><div><h2 class="card-title">Calendar & stay lengths</h2><div id="date-basis" class="small text-secondary"></div></div><span class="badge bg-cyan-lt ms-auto" id="preview-state">Source</span></div><div class="card-body p-0"><div id="timeline"></div></div></section>
    </div>
