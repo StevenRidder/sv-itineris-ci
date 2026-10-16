@@ -22,7 +22,7 @@ def validate_run(result, sha):
         raise ValueError("Public run did not complete successfully")
     if result.get("head_sha") != sha or result.get("event") != "workflow_dispatch":
         raise ValueError("Run does not verify this exact source SHA")
-    if result.get("name") != "Verify exact SV Itineris SHA" or result.get("path") != ".github/workflows/verify.yml":
+    if result.get("name") != f"SV Itineris {sha}" or result.get("path") != ".github/workflows/verify.yml":
         raise ValueError("Unexpected verification workflow")
     if result.get("repository", {}).get("full_name") != PUBLIC:
         raise ValueError("Unexpected verification repository")
@@ -48,6 +48,9 @@ def main():
             raise SystemExit("Pass the completed public run ID")
         result = json.loads(run("gh", "api", f"repos/{PUBLIC}/actions/runs/{args.run_id}"))
         validate_run(result, sha)
+        workflow = json.loads(run("gh", "api", f"repos/{PUBLIC}/actions/workflows/{result['workflow_id']}"))
+        if workflow.get("name") != "Verify exact SV Itineris SHA" or workflow.get("path") != ".github/workflows/verify.yml":
+            raise SystemExit("Unexpected workflow identity")
         jobs = json.loads(run("gh", "api", f"repos/{PUBLIC}/actions/runs/{args.run_id}/jobs"))["jobs"]
         if not jobs or any(j.get("conclusion") != "success" for j in jobs):
             raise SystemExit("A required verification job did not succeed")
