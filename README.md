@@ -36,6 +36,10 @@ Date edits chain onto the displayed preview. Route sketches change geometry only
 their calendar is unchanged. Unknown and month-level dates remain unresolved.
 
 See [the assistant contract](docs/ASSISTANT.md) and [hosting options](docs/HOSTING.md).
+The [interactive map](docs/MAPS.md) adds satellite/coastal/street views, selectable
+overlays, point inspection, measurement and editable draft routes. Public imagery
+loads online with provider attribution; Simple overview stays local. No tile key
+is required for this personal pilot.
 
 An empty database shows an import prompt; production never loads synthetic data
 automatically. For an isolated demo, import tests/fixtures with a separate

@@ -7,6 +7,8 @@ import type {GeoJSONSource, Map as GLMap} from 'maplibre-gl';
 import DOMPurify from 'dompurify';
 import {marked} from 'marked';
 import {draftEditor} from './map-draw';
+import {mapLayers} from './map-layers';
+import {mapTools} from './map-tools';
 maplibregl.setWorkerUrl(workerUrl);
 
 type Stage={id:string;name:string;start:string|null;end:string|null;window:string|null;gap_before:number;protected_duration:boolean};
@@ -24,6 +26,8 @@ let voyage:Voyage={scenarios:[],places:[],library_revision:0},current:Scenario|u
 let map:GLMap|undefined,mapReady=false,editor:ReturnType<typeof draftEditor>|undefined,markers:maplibregl.Marker[]=[];
 let selectedPlace='',saveKey='';
 let chatId:string|null=localStorage.getItem('itineris-chat'),chatReady=false,chatBusy=false,chatController:AbortController|undefined;
+let layers:ReturnType<typeof mapLayers>|undefined,tools:ReturnType<typeof mapTools>|undefined;
+let previewGeneration=0;
 
 async function api<T>(url:string,body?:unknown,headers:Record<string,string>={}):Promise<T>{
  const response=await fetch('/api/v1/'+url,{method:body===undefined?'GET':'POST',headers:body===undefined?headers:{'Content-Type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body)});
@@ -64,7 +68,7 @@ function render(){
 }
 function renderMap(){
  const s=shown();if(!s||!mapReady||!map)return;
- el('map-note').textContent=s.draft_geometry?'Draft geometry is a destination sketch. It does not recalculate the calendar or validate passages.':s.route_family==='R'?'The unresolved Solomons–Raja passage is omitted from route R. Natural Earth geographic overview; no navigation charts.':'Natural Earth destination overview. Passage allowances and exact timing remain unverified.';
+ el('map-note').textContent=s.draft_geometry?'Draft geometry is a destination sketch. It does not recalculate the calendar or validate passages.':s.route_family==='R'?'The unresolved Solomons–Raja passage is omitted from the source route. Planning overview; no navigation charts.':'Destination overview. Passage allowances and exact timing remain unverified.';
  el('draft-legend').hidden=!s.draft_geometry;
  const ids=activeIds(s.route_family),places=ids.map(id=>voyage.places.find(p=>p.id===id)).filter((p):p is Place=>!!p);
  const features:GeoJSON.Feature[]=[];
@@ -72,7 +76,8 @@ function renderMap(){
  (map.getSource('route') as GeoJSONSource).setData({type:'FeatureCollection',features});
  (map.getSource('draft') as GeoJSONSource).setData({type:'FeatureCollection',features:s.draft_geometry?[{type:'Feature',properties:{},geometry:s.draft_geometry}]:[]});
  markers.forEach(m=>m.remove());markers=[];
- for(const p of places){const button=document.createElement('button');button.className='map-pin'+(p.id===selectedPlace?' is-selected':'');button.textContent=p.name;button.type='button';button.addEventListener('click',()=>{selectedPlace=p.id;select('place').value=p.id;renderMap();});markers.push(new maplibregl.Marker({element:button}).setLngLat(p.coordinates).addTo(map));}
+ for(const p of places){const button=document.createElement('button');button.className='map-pin'+(p.id===selectedPlace?' is-selected':'');button.textContent=p.name;button.type='button';button.addEventListener('click',event=>{event.stopPropagation();selectedPlace=p.id;select('place').value=p.id;inspectPlace(p);renderMap();});markers.push(new maplibregl.Marker({element:button}).setLngLat(p.coordinates).addTo(map));}
+ el<HTMLButtonElement>('edit-route').disabled=!s.draft_geometry||chatBusy||!!editor?.active();layers?.refresh();tools?.refresh();
  map.resize();
  el('map').dataset.preview=proposal?.id||'';
 }
@@ -92,8 +97,8 @@ function citations(article:HTMLElement,sources:{id:string;title:string;revision:
 function busyChat(busy:boolean){
  chatBusy=busy;el<HTMLButtonElement>('chat-send').disabled=busy||!chatReady;el('chat-stop').hidden=!busy;
  el<HTMLButtonElement>('new-chat').disabled=busy;el<HTMLTextAreaElement>('chat-input').disabled=busy;
- select('scenario').disabled=busy||!current;document.querySelectorAll<HTMLButtonElement>('#routes button,#save,#discard,#draw-route,#preview-change,#use-coordinates').forEach(b=>b.disabled=busy);
- if(!busy){el<HTMLButtonElement>('preview-change').disabled=current?.precision!=='day';el<HTMLButtonElement>('draw-route').disabled=!mapReady;}
+ select('scenario').disabled=busy||!current;document.querySelectorAll<HTMLButtonElement>('#routes button,#save,#discard,#draw-route,#preview-change,#use-coordinates,#edit-route,#apply-route,#measure-route,#ask-map-point').forEach(b=>b.disabled=busy);
+ if(!busy){el<HTMLButtonElement>('preview-change').disabled=current?.precision!=='day';el<HTMLButtonElement>('draw-route').disabled=!mapReady;el<HTMLButtonElement>('edit-route').disabled=!shown()?.draft_geometry||!!editor?.active();}
 }
 async function connectChat(){
  try{const status=await api<{ready:boolean;message:string}>('assistant/status');chatReady=status.ready;el('chat-status').textContent=status.message;busyChat(false);
@@ -104,7 +109,7 @@ async function askChat(event:SubmitEvent){
  event.preventDefault();if(!current||chatBusy||!chatReady)return;
  const field=el<HTMLTextAreaElement>('chat-input'),message=field.value.trim();if(!message)return;
  const context={chat_id:chatId,message,scenario_id:current.id,base_revision:current.revision,proposal_id:proposal?.id||null};
- editor?.stop();el('map').classList.remove('is-drawing');el('draw-route').hidden=false;el('stop-drawing').hidden=true;
+ previewGeneration++;stopEditing();tools?.stop();
  chatMessage('user',message);const reply=chatMessage('assistant','');let text='',finished=false;field.value='';busyChat(true);chatController=new AbortController();el('chat-activity').textContent='Thinking with Codex…';
  try{
   const response=await fetch('/api/v1/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(context),signal:chatController.signal});
@@ -126,13 +131,18 @@ async function askChat(event:SubmitEvent){
  finally{busyChat(false);chatController=undefined;}
 }
 function createMap(){
- try{map=new maplibregl.Map({container:'map',center:[137,-2],zoom:2.7,style:{version:8,sources:{coast:{type:'geojson',data:'/coastline.geojson'},route:{type:'geojson',data:{type:'FeatureCollection',features:[]}},draft:{type:'geojson',data:{type:'FeatureCollection',features:[]}}},layers:[{id:'ocean',type:'background',paint:{'background-color':'#e3eef0'}},{id:'land',type:'fill',source:'coast',paint:{'fill-color':'#ceddca','fill-outline-color':'#b1c7b4'}},{id:'route',type:'line',source:'route',paint:{'line-color':'#237462','line-width':2.5,'line-dasharray':[2,2]}},{id:'draft',type:'line',source:'draft',paint:{'line-color':'#b77c22','line-width':3,'line-dasharray':[3,2]}}]},attributionControl:{compact:true,customAttribution:'Natural Earth · destination overview'}});
+ try{map=new maplibregl.Map({container:'map',center:[137,-2],zoom:2.7,maxZoom:18,style:{version:8,sources:{coast:{type:'geojson',data:'/coastline.geojson'},route:{type:'geojson',data:{type:'FeatureCollection',features:[]}},draft:{type:'geojson',data:{type:'FeatureCollection',features:[]}},measurement:{type:'geojson',data:{type:'FeatureCollection',features:[]}},'inspected-point':{type:'geojson',data:{type:'FeatureCollection',features:[]}}},layers:[{id:'ocean',type:'background',paint:{'background-color':'#e3eef0'}},{id:'land',type:'fill',source:'coast',paint:{'fill-color':'#ceddca','fill-outline-color':'#b1c7b4'}},{id:'route',type:'line',source:'route',paint:{'line-color':'#237462','line-width':2.5,'line-dasharray':[2,2]}},{id:'draft',type:'line',source:'draft',paint:{'line-color':'#b77c22','line-width':3,'line-dasharray':[3,2]}},{id:'measure-line',type:'line',source:'measurement',filter:['==',['geometry-type'],'LineString'],paint:{'line-color':'#334d72','line-width':2}},{id:'measure-points',type:'circle',source:'measurement',filter:['==',['geometry-type'],'Point'],paint:{'circle-radius':5,'circle-color':'#fff','circle-stroke-color':'#334d72','circle-stroke-width':2}},{id:'inspected-point',type:'circle',source:'inspected-point',paint:{'circle-radius':7,'circle-color':'#b77c22','circle-stroke-color':'#fff','circle-stroke-width':2}}]},attributionControl:{compact:false,customAttribution:'<a href="https://www.naturalearthdata.com/">Natural Earth</a> · planning map'}});
  map.addControl(new maplibregl.NavigationControl(),'top-right');
- map.on('load',()=>{mapReady=true;el<HTMLButtonElement>('draw-route').disabled=false;editor=draftEditor(map!,coords=>{el('map').classList.remove('is-drawing');el('stop-drawing').hidden=true;el('draw-route').hidden=false;void previewGeometry(coords);});renderMap();});
- map.on('error',e=>{notice('A map layer could not load: '+e.error.message);});
+ map.addControl(new maplibregl.FullscreenControl({container:el('map-card')}),'top-right');map.addControl(new maplibregl.ScaleControl({unit:'nautical'}),'bottom-left');
+ map.on('load',()=>{mapReady=true;el<HTMLButtonElement>('draw-route').disabled=false;editor=draftEditor(map!,coords=>{stopEditing();void previewGeometry(coords);});
+  layers=mapLayers(map!);tools=mapTools(map!,{isDrawing:()=>!!editor?.active(),measure:points=>api('map/measure',{type:'LineString',coordinates:points}),points:()=>shown()?.draft_geometry?.coordinates as [number,number][]||activeIds(shown()?.route_family||'R').flatMap(id=>{const p=voyage.places.find(p=>p.id===id);return p?[p.coordinates]:[];}),info:name=>{const p=voyage.places.find(p=>p.name===name),stage=shown()?.stages.find(s=>s.id===p?.id);return !name?'':stage?.start&&stage.end?`${date(stage.start)} – ${date(stage.end)}`:stage?.window||'Dates not resolved for this destination';},ask:(point,name)=>{if(chatBusy)return;viewLibrary(false);el<HTMLTextAreaElement>('chat-input').value=`Help me plan near ${name?name+' ':''}(${point[1].toFixed(5)}°, ${point[0].toFixed(5)}°). What evidence do my guides provide for this area?`;el('chat-input').focus();el('chat-form').scrollIntoView({behavior:'smooth',block:'nearest'});}});renderMap();});
+ map.on('error',e=>{if(!(e as {sourceId?:string}).sourceId?.startsWith('tiles-'))notice('A map layer could not load: '+e.error.message);});
  }catch(e){notice('Map unavailable; the scenario and coordinate controls remain usable.');}
 }
-async function previewOperation(operation:unknown){if(!current)return;clearError();const base=current;const result=await api<Proposal>(`scenarios/${base.id}/preview`,{base_revision:base.revision,operations:[operation]});if(current?.id!==base.id||current.revision!==base.revision)return;proposal=result;saveKey=crypto.randomUUID();render();notice('Preview calculated by the backend. Original source and saved options are unchanged.');}
+async function previewOperation(operation:unknown){if(!current)return;clearError();const base=current,generation=++previewGeneration;const result=await api<Proposal>(`scenarios/${base.id}/preview`,{base_revision:base.revision,operations:[operation],previous_proposal_id:proposal?.id||null});if(generation!==previewGeneration||current?.id!==base.id||current.revision!==base.revision)return;proposal=result;saveKey=crypto.randomUUID();render();notice('Preview calculated by the backend. Original source and saved options are unchanged.');}
+function stopEditing(){editor?.stop();editingControls(false);}
+function editingControls(active:boolean){el('map').classList.toggle('is-drawing',active);el('draw-route').hidden=active;el('apply-route').hidden=true;el('stop-drawing').hidden=!active;el<HTMLButtonElement>('edit-route').disabled=active||!shown()?.draft_geometry||chatBusy;for(const id of ['measure-route','preview-change','use-coordinates','save'])el<HTMLButtonElement>(id).disabled=active||chatBusy;el<HTMLButtonElement>('preview-change').disabled=active||chatBusy||current?.precision!=='day';}
+function inspectPlace(p:Place){tools?.inspect(p.coordinates,p.name);}
 async function previewGeometry(coords:number[][]){try{await previewOperation({op:'set_route_geometry',geometry:{type:'LineString',coordinates:coords}});}catch(e){error(e);}}
 async function loadDocuments(){
  const docs=await api<{id:string;title:string;revision:number}[]>('library?q='+encodeURIComponent(input('search').value));
@@ -145,15 +155,18 @@ async function showDocument(id:string){
  }catch(e){error(e);}
 }
 function viewLibrary(yes:boolean){el('library-view').hidden=!yes;el('plan-view').hidden=yes||!current;el('nav-plan').classList.toggle('btn-primary',!yes);el('nav-library').classList.toggle('btn-primary',yes);if(!yes)map?.resize();}
-select('scenario').addEventListener('change',()=>{proposal=undefined;current=voyage.scenarios.find(s=>s.id===select('scenario').value);editor?.stop();render();clearError();});
-el('routes').addEventListener('click',e=>{const button=(e.target as Element).closest<HTMLElement>('[data-route]');if(!button)return;const family=button.dataset.route;const next=voyage.scenarios.find(s=>s.route_family===family&&s.id===(family==='R'?'source-B':family==='H'?'source-E':'source-F'))||voyage.scenarios.find(s=>s.route_family===family);if(next){current=next;proposal=undefined;select('scenario').value=next.id;editor?.stop();render();clearError();}});
+select('scenario').addEventListener('change',()=>{previewGeneration++;proposal=undefined;current=voyage.scenarios.find(s=>s.id===select('scenario').value);stopEditing();render();clearError();});
+el('routes').addEventListener('click',e=>{const button=(e.target as Element).closest<HTMLElement>('[data-route]');if(!button)return;const family=button.dataset.route;const next=voyage.scenarios.find(s=>s.route_family===family&&s.id===(family==='R'?'source-B':family==='H'?'source-E':'source-F'))||voyage.scenarios.find(s=>s.route_family===family);if(next){previewGeneration++;current=next;proposal=undefined;select('scenario').value=next.id;stopEditing();render();clearError();}});
 el('change-form').addEventListener('submit',async e=>{e.preventDefault();try{await previewOperation({op:'extend_stay',stage_id:select('stage').value,nights:Number(input('nights').value)});}catch(e){error(e);}});
 el('save').addEventListener('click',async()=>{if(!proposal)return;const button=el<HTMLButtonElement>('save');button.disabled=true;try{const saved=await api<Scenario>(`proposals/${proposal.id}/save-as`,{name:input('save-name').value},{'Idempotency-Key':saveKey});proposal=undefined;await load(saved.id);notice('Saved a new draft. Its parent and all source options remain available.');}catch(e){error(e);}finally{button.disabled=false;}});
-el('discard').addEventListener('click',()=>{proposal=undefined;render();notice('Preview discarded. Saved records are unchanged.');});
-el('draw-route').addEventListener('click',()=>{if(!editor)return;editor.start();el('map').classList.add('is-drawing');el('draw-route').hidden=true;el('stop-drawing').hidden=false;notice('Click to add route points; press Enter or click the last point to finish a draft preview.');});
-el('stop-drawing').addEventListener('click',()=>{editor?.stop();el('map').classList.remove('is-drawing');el('draw-route').hidden=false;el('stop-drawing').hidden=true;});
+el('discard').addEventListener('click',()=>{previewGeneration++;proposal=undefined;stopEditing();render();notice('Preview discarded. Saved records are unchanged.');});
+el('draw-route').addEventListener('click',()=>{if(!editor)return;tools?.stop();editor.start();editingControls(true);notice('Click to add route points; press Enter or click the last point to finish a draft preview.');});
+el('stop-drawing').addEventListener('click',stopEditing);
+el('edit-route').addEventListener('click',()=>{const geometry=shown()?.draft_geometry;if(!editor||!geometry)return;try{tools?.stop();editor.edit(geometry.coordinates);editingControls(true);el('apply-route').hidden=false;notice('Drag a point or midpoint, then Preview edited route. Cancel sketch restores the current preview.');}catch(e){error(e);}});
+el('apply-route').addEventListener('click',()=>{try{editor?.apply();}catch(e){error(e);}});
 el('use-coordinates').addEventListener('click',()=>{const coords=el<HTMLTextAreaElement>('coordinates').value.trim().split('\n').map(line=>line.split(',').map(v=>Number(v.trim())));void previewGeometry(coords);});
 select('place').addEventListener('change',()=>{selectedPlace=select('place').value;renderMap();});
+el('zoom-place').addEventListener('click',()=>{const p=voyage.places.find(p=>p.id===selectedPlace);if(p){inspectPlace(p);map?.flyTo({center:p.coordinates,zoom:11,duration:700});}});
 el('place-guide').addEventListener('click',async()=>{input('search').value=voyage.places.find(p=>p.id===selectedPlace)?.name||'';viewLibrary(true);try{await loadDocuments();}catch(e){error(e);}});
 el('nav-plan').addEventListener('click',()=>viewLibrary(false));el('nav-library').addEventListener('click',()=>viewLibrary(true));
 el('documents').addEventListener('click',e=>{const id=(e.target as Element).closest<HTMLElement>('[data-doc]')?.dataset.doc;if(id)void showDocument(id);});

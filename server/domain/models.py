@@ -1,6 +1,7 @@
 from datetime import date
 from math import isfinite
 from typing import Annotated, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -76,6 +77,10 @@ Operation = Annotated[ExtendStay | SetRouteGeometry | ShiftDeparture | SetArriva
 class PreviewRequest(StrictModel):
     base_revision: int = Field(ge=1)
     operations: list[Operation] = Field(min_length=1, max_length=10)
+
+
+class BrowserPreviewRequest(PreviewRequest):
+    previous_proposal_id: UUID | None = None
 
 
 class SaveRequest(StrictModel):

@@ -24,6 +24,9 @@ user explicitly changes that state in a future supported workflow.
 - Codex subscription chat with bounded guide/planning tools, source receipts,
   persistent conversations, streamed previews and map updates.
 - Code-owned departure and arrival changes alongside stay-length changes.
+- Coastal, street and satellite basemaps with labels and community seamarks;
+  retained simple/offline overview, route overlays, point inspection, measurement
+  and editable draft geometry. Imagery is context, not current charts or depths.
 
 ## Next milestones
 
