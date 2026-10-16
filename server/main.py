@@ -11,7 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from server.adapters.store import Store, canonical, checksum, now
-from server.domain.models import PreviewRequest, SaveRequest, Scenario
+from server.domain.models import BrowserPreviewRequest, Geometry, SaveRequest, Scenario
+from server.domain.geography import measure_geometry
 from server.codex_adapter import CodexProcess
 from server.chat import install_chat
 from server.services import make_preview
@@ -37,7 +38,7 @@ def create_app(data_dir=None, assistant_factory=CodexProcess):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Cache-Control"] = "no-store"
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.maps.eox.at https://tiles.openseamap.org; font-src 'self'; connect-src 'self' https://tiles.maps.eox.at https://tiles.openseamap.org; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
         return response
 
     def get_scenario(scenario_id):
@@ -62,8 +63,12 @@ def create_app(data_dir=None, assistant_factory=CodexProcess):
         return get_scenario(scenario_id)
 
     @app.post("/api/v1/scenarios/{scenario_id}/preview")
-    def preview(scenario_id: str, body: PreviewRequest):
-        return make_preview(store, scenario_id, body)
+    def preview(scenario_id: str, body: BrowserPreviewRequest):
+        return make_preview(store, scenario_id, body, str(body.previous_proposal_id) if body.previous_proposal_id else None)
+
+    @app.post("/api/v1/map/measure")
+    def measure(body: Geometry):
+        return measure_geometry(body)
 
     @app.post("/api/v1/proposals/{proposal_id}/save-as", status_code=201)
     def save(proposal_id: str, body: SaveRequest, idempotency_key: str = Header(min_length=8, max_length=128)):

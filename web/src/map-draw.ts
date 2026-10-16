@@ -9,13 +9,28 @@ import type { Map } from 'maplibre-gl';
 export function draftEditor(map: Map, onDraft: (coordinates: number[][]) => void) {
   const draw = new TerraDraw({adapter:new TerraDrawMapLibreGLAdapter({map}),modes:[new TerraDrawLineStringMode({keyEvents:{finish:'Enter',cancel:'Escape'}}),new TerraDrawSelectMode({flags:{linestring:{feature:{draggable:true,coordinates:{midpoints:true,draggable:true,deletable:true}}}}})]});
   draw.start();
-  let active=false;
+  let active=false,editing=false;
   draw.on('finish',(id)=>{
     const feature=draw.getSnapshot().find(f=>f.id===id);
-    if(feature?.geometry.type!=='LineString')return;
+    if(editing||feature?.geometry.type!=='LineString')return;
     const coordinates=feature.geometry.coordinates;
     draw.clear();draw.setMode('select');active=false;
     onDraft(coordinates);
   });
-  return {start(){active=true;draw.setMode('linestring');},stop(){active=false;draw.clear();draw.setMode('select');},active:()=>active};
+  return {
+    start(){editing=false;active=true;draw.clear();draw.setMode('linestring');},
+    edit(coordinates:number[][]){
+      draw.clear();editing=true;active=true;draw.setMode('select');
+      const id=draw.getFeatureId();
+      const result=draw.addFeatures([{id,type:'Feature',geometry:{type:'LineString',coordinates},properties:{mode:'linestring'}}]);
+      if(!result[0]?.valid){active=false;editing=false;throw new Error('This draft geometry could not be edited');}
+      draw.selectFeature(id);
+    },
+    apply(){
+      const feature=draw.getSnapshot().find(f=>f.geometry.type==='LineString');
+      if(feature?.geometry.type!=='LineString')throw new Error('No editable draft found');
+      const coords=feature.geometry.coordinates;active=false;editing=false;draw.clear();draw.setMode('select');onDraft(coords);
+    },
+    stop(){active=false;editing=false;draw.clear();draw.setMode('select');},active:()=>active
+  };
 }
