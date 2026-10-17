@@ -94,6 +94,40 @@ test('map layers, measurement, point inspection and editable drafts preserve dat
  expect(errors).toEqual([]);
 });
 
+test('seasonal layers preserve overlap, private notes and active date previews',async({page})=>{
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('/');await expect(page.locator('#season-guide')).toBeVisible();
+ await expect(page.locator('#season-source')).toContainText('Synthetic seasonal fixture');
+ await page.getByText('Manual planning controls',{exact:true}).click();
+ await page.getByRole('button',{name:'Preview change',exact:true}).click();
+ await expect(page.locator('#proposal')).toBeVisible();
+ const proposal=await page.locator('#map').getAttribute('data-preview');
+ const dates=await page.locator('[data-stage="palau"]').textContent();
+ await page.locator('.season-cell[data-stop="test-south"][data-month="11"]').click();
+ await expect(page.locator('#season-summary')).toContainText('Nov · Test southern stop · Preferred window · Test storm');
+ await expect(page.locator('.season-cell[data-stop="test-south"][data-month="11"] .is-preferred')).toBeVisible();
+ await expect(page.locator('.season-cell[data-stop="test-south"][data-month="11"] .risk-storm')).toBeVisible();
+ await expect(page.locator('#season-detail')).toContainText('early storm');
+ await page.getByLabel('Hazard seasons',{exact:true}).uncheck();
+ await page.getByLabel('Preferred windows',{exact:true}).uncheck();
+ await page.getByLabel('View',{exact:true}).selectOption('satellite');
+ await expect(page.locator('#map')).toHaveAttribute('data-season-month','11');
+ await expect(page.locator('#map')).toHaveAttribute('data-preview',proposal!);
+ await expect(page.locator('[data-stage="palau"]')).toHaveText(dates!);
+ await page.getByLabel('Stop details',{exact:true}).selectOption('test-north');
+ await page.getByLabel('Map month',{exact:true}).selectOption('2');
+ await expect(page.locator('#season-summary')).toContainText('Best within preferred window');
+ await page.locator('.map-layer-picker summary').click();
+ await page.getByLabel('Seasonal planning',{exact:true}).uncheck();
+ await expect(page.locator('#map')).toHaveAttribute('data-season-layer','false');
+ await page.reload();await expect(page.locator('#season-guide')).toBeVisible();
+ await expect(page.getByLabel('Map month',{exact:true})).toHaveValue('2');
+ await expect(page.locator('#map')).toHaveAttribute('data-season-layer','false');
+ await page.setViewportSize({width:320,height:900});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ expect(errors).toEqual([]);
+});
+
 test('tile failure leaves the local map and planning controls usable',async({page})=>{
  const pending:Route[]=[];let first=true,released=false;
  const outage={status:503,body:'Synthetic provider outage',headers:{'Access-Control-Allow-Origin':'*'}};

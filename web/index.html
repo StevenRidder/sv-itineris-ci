@@ -28,6 +28,7 @@
        <label class="form-check"><input class="form-check-input" type="checkbox" id="layer-destinations" checked><span class="form-check-label">Voyage destinations</span></label>
        <label class="form-check"><input class="form-check-input" type="checkbox" id="layer-source" checked><span class="form-check-label">Source route overview</span></label>
        <label class="form-check"><input class="form-check-input" type="checkbox" id="layer-draft" checked><span class="form-check-label">Draft route preview</span></label>
+       <label class="form-check"><input class="form-check-input" type="checkbox" id="layer-seasons" disabled><span class="form-check-label">Seasonal planning</span></label>
       </div></details>
       <div id="satellite-controls" hidden><label for="satellite-blend" class="small">Satellite blend <span id="blend-value">100%</span></label><input id="satellite-blend" class="form-range" type="range" min="0" max="100" value="100"></div>
      </div>
@@ -42,6 +43,18 @@
      </div>
     </section>
     <div class="map-legend" aria-label="Map route legend"><span class="source-line">Source route overview</span><span class="draft-line" id="draft-legend" hidden>Draft geometry preview</span></div>
+    <section class="card mt-3" id="season-guide" hidden>
+     <div class="card-header"><div><h2 class="card-title">Seasonal planning</h2><div class="small text-secondary" id="season-source"></div></div></div>
+     <div class="card-body">
+      <div class="d-flex flex-wrap gap-3 align-items-end mb-3"><div><label class="form-label" for="season-month">Map month</label><select id="season-month" class="form-select"></select></div><label class="form-check mb-2"><input class="form-check-input" type="checkbox" id="season-preferred" checked><span class="form-check-label">Preferred windows</span></label><label class="form-check mb-2"><input class="form-check-input" type="checkbox" id="season-hazards" checked><span class="form-check-label">Hazard seasons</span></label><button type="button" class="btn btn-sm mb-1" id="season-fit">Show all seasonal stops</button></div>
+      <div class="season-key mb-3" aria-label="Seasonal legend"><span><b class="key-preferred">●</b> Preferred</span><span><b class="key-preferred">★</b> Best within window</span><span><b class="key-storm">!</b> Cyclone / typhoon</span><span><b class="key-monsoon">~</b> Monsoon / squalls</span><span><b class="key-wet">≈</b> Wet season</span><span>Fill + ring = overlap · thicker ring = peak</span></div>
+      <div id="season-summary" class="mb-3" role="status"></div>
+      <div id="season-grid" class="table-responsive"></div>
+      <div class="d-flex flex-wrap gap-2 align-items-end mt-3"><div class="flex-grow-1"><label class="form-label" for="season-stop">Stop details</label><select id="season-stop" class="form-select"></select></div><button type="button" class="btn btn-sm mb-1" id="season-zoom">Show area</button></div>
+      <div id="season-detail" class="small mt-3"></div>
+      <details class="small text-secondary mt-3"><summary>Regional notes & scope</summary><div id="season-regional" class="mt-2"></div><div class="mt-2">Seasonal guidance from supplied notes, not a forecast. A preferred month can still have hazardous weather. Calendar dates and route options remain unchanged.</div></details>
+     </div>
+    </section>
     <section class="card mt-3"><div class="card-header"><div><h2 class="card-title">Calendar & stay lengths</h2><div id="date-basis" class="small text-secondary"></div></div><span class="badge bg-cyan-lt ms-auto" id="preview-state">Source</span></div><div class="card-body p-0"><div id="timeline"></div></div></section>
    </div>
   </div>
