@@ -8,6 +8,8 @@ os.environ["SVITINERIS_DATA_DIR"] = str(root / ".data/browser")
 from server.adapters.importer import import_folder
 from server.adapters.store import Store
 import_folder(Store(os.environ["SVITINERIS_DATA_DIR"]), root / "tests/fixtures")
+from shutil import copyfile
+copyfile(root / "tests/fixtures/seasonal-guide.json", Path(os.environ["SVITINERIS_DATA_DIR"]) / "seasonal-guide.json")
 import uvicorn
 from server.main import create_app
 from tests.fake_codex import FakeCodex
