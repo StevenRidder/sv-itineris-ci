@@ -13,6 +13,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from server.adapters.store import Store, canonical, checksum, now
 from server.domain.models import BrowserPreviewRequest, Geometry, SaveRequest, Scenario
 from server.domain.geography import measure_geometry
+from server.domain.seasons import read_seasonal_guide
 from server.codex_adapter import CodexProcess
 from server.chat import install_chat
 from server.services import make_preview
@@ -69,6 +70,13 @@ def create_app(data_dir=None, assistant_factory=CodexProcess):
     @app.post("/api/v1/map/measure")
     def measure(body: Geometry):
         return measure_geometry(body)
+
+    @app.get("/api/v1/seasons")
+    def seasons():
+        try:
+            return read_seasonal_guide(store.directory)
+        except (ValueError, OSError):
+            raise HTTPException(503, "Seasonal notes could not be read. Check the local seasonal-guide.json file.") from None
 
     @app.post("/api/v1/proposals/{proposal_id}/save-as", status_code=201)
     def save(proposal_id: str, body: SaveRequest, idempotency_key: str = Header(min_length=8, max_length=128)):

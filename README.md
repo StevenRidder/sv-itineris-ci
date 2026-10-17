@@ -41,6 +41,12 @@ overlays, point inspection, measurement and editable draft routes. Public imager
 loads online with provider attribution; Simple overview stays local. No tile key
 is required for this personal pilot.
 
+Optional private seasonal notes in `.data/seasonal-guide.json` add a month-based
+map layer and annual preferred/hazard grid. Overlap months retain both signals;
+changing the displayed month never changes voyage dates. See docs/MAPS.md for
+the input contract and source limitations. Private seasonal prose stays outside
+Git and public CI.
+
 An empty database shows an import prompt; production never loads synthetic data
 automatically. For an isolated demo, import tests/fixtures with a separate
 SVITINERIS_DATA_DIR. Runtime data defaults to .data and stays outside Git.

@@ -9,6 +9,7 @@ import {marked} from 'marked';
 import {draftEditor} from './map-draw';
 import {mapLayers} from './map-layers';
 import {mapTools} from './map-tools';
+import {seasonGuide,type SeasonalGuide} from './seasons';
 maplibregl.setWorkerUrl(workerUrl);
 
 type Stage={id:string;name:string;start:string|null;end:string|null;window:string|null;gap_before:number;protected_duration:boolean};
@@ -136,6 +137,7 @@ function createMap(){
  map.addControl(new maplibregl.FullscreenControl({container:el('map-card')}),'top-right');map.addControl(new maplibregl.ScaleControl({unit:'nautical'}),'bottom-left');
  map.on('load',()=>{mapReady=true;el<HTMLButtonElement>('draw-route').disabled=false;editor=draftEditor(map!,coords=>{stopEditing();void previewGeometry(coords);});
   layers=mapLayers(map!);tools=mapTools(map!,{isDrawing:()=>!!editor?.active(),measure:points=>api('map/measure',{type:'LineString',coordinates:points}),points:()=>shown()?.draft_geometry?.coordinates as [number,number][]||activeIds(shown()?.route_family||'R').flatMap(id=>{const p=voyage.places.find(p=>p.id===id);return p?[p.coordinates]:[];}),info:name=>{const p=voyage.places.find(p=>p.name===name),stage=shown()?.stages.find(s=>s.id===p?.id);return !name?'':stage?.start&&stage.end?`${date(stage.start)} – ${date(stage.end)}`:stage?.window||'Dates not resolved for this destination';},ask:(point,name)=>{if(chatBusy)return;viewLibrary(false);el<HTMLTextAreaElement>('chat-input').value=`Help me plan near ${name?name+' ':''}(${point[1].toFixed(5)}°, ${point[0].toFixed(5)}°). What evidence do my guides provide for this area?`;el('chat-input').focus();el('chat-form').scrollIntoView({behavior:'smooth',block:'nearest'});}});renderMap();});
+ map.once('load',()=>{void api<SeasonalGuide>('seasons').then(guide=>seasonGuide(map!,guide)).catch(()=>notice('Seasonal notes are unavailable. Check the local seasonal-guide.json file.'));});
  map.on('error',e=>{if(!(e as {sourceId?:string}).sourceId?.startsWith('tiles-'))notice('A map layer could not load: '+e.error.message);});
  }catch(e){notice('Map unavailable; the scenario and coordinate controls remain usable.');}
 }
